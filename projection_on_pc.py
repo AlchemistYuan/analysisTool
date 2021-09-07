@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../scripts/')
+sys.path.append('/projectnb/cui-buchem/yuchen/scripts/')
 
 import MDAnalysis as mda
 from MDAnalysis.analysis import align

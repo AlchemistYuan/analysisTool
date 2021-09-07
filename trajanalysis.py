@@ -41,7 +41,7 @@ def align_traj(psfs: list, dcds: list, ref: MDAnalysis.Universe, atoms: str) -> 
         print('one trajectory completed...')
     return universes
 
-def pca_scikit(universes: list, atoms: str) -> Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.array]:
+def pca_scikit(universes: list, atoms: str) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.array]:
     '''
     Perform PCA on a list of Universe.
 
@@ -92,14 +92,14 @@ def pca_scikit(universes: list, atoms: str) -> Tuple[numpy.ndarray, numpy.ndarra
     components = pca.components_
     variance = pca.components_
     mean_coor = np.mean(coor, axis=0)/10
-    return proj, components, variance, mean_coor, ntraj
+    return (proj, components, variance, mean_coor, ntraj)
 
 def tica_pyemma(coor, lag):
     tica_runner = pyemma.coordinates.tica(coor, lag=lag)
     tica_output = tica_runner.get_output()
     tica_eigvecs = tica_runner.eigenvectors
     tica_eigvals = tica_runner.eigenvalues
-    return tica_output, tica_eigvecs, tica_eigvals)
+    return (tica_output, tica_eigvecs, tica_eigvals)
 
 def projection(pcs: numpy.ndarray, ref_coor: numpy.ndarray, universe: MDAnalysis.Universe, atoms: str) -> numpy.ndarray:
     '''
