@@ -9,3 +9,4 @@ Requirement:
   - scikit-learn
   - mdanalysis
   - mdtraj
+  - pyemma
