@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import MDAnalysis as mda
 import MDAnalysis.analysis.rms
 import numpy as np
@@ -41,7 +43,7 @@ def align_traj(psfs: list, dcds: list, ref: MDAnalysis.Universe, atoms: str) -> 
         print('one trajectory completed...')
     return universes
 
-def pca_scikit(universes: list, atoms: str) -> tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.array]:
+def pca_scikit(universes: list, atoms: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.array]:
     '''
     Perform PCA on a list of Universe.
 
@@ -54,15 +56,15 @@ def pca_scikit(universes: list, atoms: str) -> tuple[numpy.ndarray, numpy.ndarra
 
     Returns
     -------
-    proj : numpy.ndarray
-        A numpy ndarray of shape (n_samples, n_components) to store the projection along certain PC axis.
-    components : numpy.ndarray
+    proj : np.ndarray
+        A np ndarray of shape (n_samples, n_components) to store the projection along certain PC axis.
+    components : np.ndarray
         Principal axes in feature space, representing the directions of maximum variance in the data.
-    variance : numpy.ndarray
+    variance : np.ndarray
         The amount of variance explained by each of the selected components.
-    mean_coor : numpy.ndarray
+    mean_coor : np.ndarray
         The average coordinates to be subtracted in PCA.
-    ntraj : numpy.array
+    ntraj : np.array
         The length of each trajectory.
     '''
     print('starting PCA...')
@@ -90,7 +92,7 @@ def pca_scikit(universes: list, atoms: str) -> tuple[numpy.ndarray, numpy.ndarra
     print('retrieving necessary results...')
     proj = proj[:,:10]
     components = pca.components_
-    variance = pca.components_
+    variance = pca.explained_variance_
     mean_coor = np.mean(coor, axis=0)/10
     return (proj, components, variance, mean_coor, ntraj)
 
@@ -101,15 +103,15 @@ def tica_pyemma(coor, lag):
     tica_eigvals = tica_runner.eigenvalues
     return (tica_output, tica_eigvecs, tica_eigvals)
 
-def projection(pcs: numpy.ndarray, ref_coor: numpy.ndarray, universe: MDAnalysis.Universe, atoms: str) -> numpy.ndarray:
+def projection(pcs: np.ndarray, ref_coor: np.ndarray, universe: MDAnalysis.Universe, atoms: str) -> np.ndarray:
     '''
     Project a MD trajectory onto a set of pre-computed PCA axis.
 
     Parameters
     ----------
-    pcs : numpy.ndarray
+    pcs : np.ndarray
         A set of pre-computed PC coordinates
-    ref_coor : numpy.ndarray
+    ref_coor : np.ndarray
         The average structure to be subtracted from the trajectory
     universe : MDAnalysis.Universe
         The trajecotry to be used in the projection
@@ -118,7 +120,7 @@ def projection(pcs: numpy.ndarray, ref_coor: numpy.ndarray, universe: MDAnalysis
 
     Returns
     -------
-    proj : numpy.ndarray
+    proj : np.ndarray
         The projection of the trajectory onto the PCs.
     '''
     # Get all coordinates of each frame.

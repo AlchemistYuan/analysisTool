@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../scripts/')
+sys.path.append('/projectnb/cui-buchem/yuchen/scripts/')
 
 import MDAnalysis as mda
 import MDAnalysis.analysis.rms
@@ -51,3 +51,7 @@ def main() -> int:
     rmsd_all = rmsd(universes, ref, "protein and backbone and not resid 156:164")
     
     np.savetxt("rmsd_"+outflag+"_noloop.txt", rmsd_all)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
