@@ -1,6 +1,7 @@
 import sys
 sys.path.append('/projectnb/cui-buchem/yuchen/scripts/')
 
+import argparse
 import numpy as np
 import MDAnalysis as mda
 from trajanalysis import *
