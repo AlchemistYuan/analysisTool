@@ -1,2 +1,11 @@
 This repo contains frequently used scipts in the post-processing of MD trajectories.
 Most of them are python scripts. Others are tcl scripts used by VMD.
+
+Requirement:
+  - python
+  # third-party packages
+  - numpy
+  - scipy
+  - scikit-learn
+  - mdanalysis
+  - mdtraj
