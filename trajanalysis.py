@@ -59,7 +59,7 @@ def pca_scikit(universes: list, atoms: str) -> Tuple[np.ndarray, np.ndarray, np.
     proj : np.ndarray
         A np ndarray of shape (n_samples, n_components) to store the projection along certain PC axis.
     components : np.ndarray
-        Principal axes in feature space, representing the directions of maximum variance in the data.
+        Principal axes in feature space of shape (n_components, n_features), representing the directions of maximum variance in the data.
     variance : np.ndarray
         The amount of variance explained by each of the selected components.
     mean_coor : np.ndarray
@@ -96,13 +96,6 @@ def pca_scikit(universes: list, atoms: str) -> Tuple[np.ndarray, np.ndarray, np.
     mean_coor = np.mean(coor, axis=0)/10
     return (proj, components, variance, mean_coor, ntraj)
 
-def tica_pyemma(coor, lag):
-    tica_runner = pyemma.coordinates.tica(coor, lag=lag)
-    tica_output = tica_runner.get_output()
-    tica_eigvecs = tica_runner.eigenvectors
-    tica_eigvals = tica_runner.eigenvalues
-    return (tica_output, tica_eigvecs, tica_eigvals)
-
 def projection(pcs: np.ndarray, ref_coor: np.ndarray, universe: MDAnalysis.Universe, atoms: str) -> np.ndarray:
     '''
     Project a MD trajectory onto a set of pre-computed PCA axis.
@@ -132,7 +125,8 @@ def projection(pcs: np.ndarray, ref_coor: np.ndarray, universe: MDAnalysis.Unive
     x = frame.ravel().reshape(frame.shape[0],3*frame.shape[1])
     # Compute the dot products
     proj = np.dot(x, pcs.T)
-    proj = proj[:,:10]
+    if proj.shape[1] > 10:
+        proj = proj[:,:10]
     return proj
 
 def rmsd(universes, ref, refatoms):
