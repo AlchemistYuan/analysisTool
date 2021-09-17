@@ -7,4 +7,4 @@ dcd=$2
 boxsize=$3
 outname=$4
 
-vmd -dispdev text -e ../scripts/pbcwrap.tcl -args $psf $dcd $boxsize $outname 
+vmd -dispdev text -e /projectnb/cui-buchem/yuchen/scripts/pbcwrap.tcl -args $psf $dcd $boxsize $outname 
