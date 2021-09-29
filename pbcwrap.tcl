@@ -17,7 +17,7 @@ proc wrap_protein {syspsf sysdcd boxsize outname} {
     pbc set "$boxsize $boxsize $boxsize" -all
     pbc wrap -center com -centersel "segid PROA" -compound residue -all
     pbc wrap -center com -centersel "protein" -compound residue -all
-    animate write dcd ${outname}_rewrapped.dcd beg 0 end -1 skip 1 waitfor all
+    animate write dcd ${outname}_rewrapped.dcd beg 0 skip 1 waitfor all
 }
 
 set syspsf [lindex $argv 0];

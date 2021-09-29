@@ -3,6 +3,7 @@ from typing import Tuple
 import MDAnalysis as mda
 import MDAnalysis.analysis.rms
 import numpy as np
+import pyemma
 from MDAnalysis.analysis import align
 from sklearn.cluster import KMeans
 from numpy.linalg import eig
@@ -42,6 +43,60 @@ def align_traj(psfs: list, dcds: list, ref: MDAnalysis.Universe, atoms: str) -> 
         universes.append(u)
         print('one trajectory completed...')
     return universes
+
+def pca_pyemma(universes: list, atoms: str, dim: int=2) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.array]:
+    '''
+    Perform PCA on a list of Universe.
+
+    Parameters
+    ----------
+    universes : list
+        A list of Universe to be used in PCA.
+    atoms : str
+        An atom selection string to be used in PCA.
+    dim : int
+        The dimension of the PCA projection
+
+    Returns
+    -------
+    output : np.ndarray
+        A np ndarray of shape (n_samples, n_components) to store the projection along certain PC axis.
+    eigvecs : np.ndarray
+        Principal axes in feature space of shape (n_components, n_features), representing the directions of maximum variance in the data.
+    eigvals : np.ndarray
+        The amount of variance explained by each of the selected components.
+    mean_coor : np.ndarray
+        The average coordinates to be subtracted in PCA.
+    ntraj : np.array
+        The length of each trajectory.
+    '''
+    print('starting pyemma PCA...')
+    ntraj = []
+    natoms = len(universes[0].select_atoms(atoms))
+    for u in universes:
+        ntraj.append(len(u.trajectory))
+    ntraj = np.asarray(ntraj, dtype=int)
+    coor = np.zeros((np.sum(ntraj), natoms, 3), dtype=np.float32)
+    start = 0
+    end = 0
+    print('Reading coordinates...')
+    for i, u in enumerate(universes):
+        end += ntraj[i]
+        coor[start:end,:,:] = u.trajectory.timeseries(u.select_atoms(atoms), order='fac')
+        start += ntraj[i]
+
+    offset = coor - np.mean(coor, axis=0)
+    x = offset.ravel().reshape(offset.shape[0],3*offset.shape[1])
+    x = x.astype('float32')
+
+    runner = pyemma.coordinates.pca(x, dim=dim)
+    output = runner.get_output()
+    output = np.concatenate(output)
+    eigvecs = runner.eigenvectors
+    eigvals = runner.eigenvalues
+    mean_coor = runner.mean
+    mean_coor = np.reshape(mean_coor, (-1,3))
+    return (output, eigvecs.T, eigvals, mean_coor, ntraj)
 
 def pca_scikit(universes: list, atoms: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.array]:
     '''

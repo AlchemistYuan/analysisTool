@@ -1,15 +1,12 @@
 import sys
-sys.path.append('/projectnb/cui-buchem/yuchen/scripts/')
+sys.path.append('/projectnb/cui-buchem/yuchen/scripts')
 
-import MDAnalysis as mda
-from MDAnalysis.analysis import align
-import numpy as np
-from sklearn.cluster import KMeans
-from numpy.linalg import eig
-from sklearn.decomposition import PCA
-from trajanalysis import *
 import argparse
+import pyemma
+import MDAnalysis as mda
 
+from msmanalysis import *
+from trajanalysis import *
 
 def read_argument() -> argparse.Namespace:
     '''
@@ -26,16 +23,16 @@ def read_argument() -> argparse.Namespace:
     '''
     # Read the command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', dest='psf', nargs='+', help='Lisf of psf files', required=True)
+    parser.add_argument('-f', dest='psf', help='The psf file', required=True)
     parser.add_argument('-d', dest='dcd', nargs='+', help='List of dcd files', default=None)
     parser.add_argument('-dl', dest='dcdfile', type=str, help='File containing the names of dcd files', default=None)
-    parser.add_argument('-p', dest='refpdb', help='pdb file of ref', required=True)
-    parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='protein and backbone')
-    parser.add_argument('-pa', dest='pcaatoms', help='atoms used in PCA', default='protein and name CA')
+    parser.add_argument('-p', dest='ref', help='pdb file of ref', required=True)
+    parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='name CA')
+    parser.add_argument('-l', dest='lag', type=int, help='lag time of TICA', default=10)
+    parser.add_argument('-n', dest='dim', type=int, help='dimension of the projection', default=2)
     parser.add_argument('-o', dest='outflag', help='output file flag', default='out')
     args = parser.parse_args()
     return args
-
 
 def main() -> int:
     '''
@@ -54,26 +51,22 @@ def main() -> int:
                 l = line.strip()
                 dcds.append(l)
                 line = f.readline()
-    rpdb = args.refpdb
-    atoms = args.atoms
-    pcaatoms = args.pcaatoms
+    psfs = [psfs] * len(dcds)
     outflag = args.outflag
-    ref = mda.Universe(rpdb)
+    lag = args.lag
+    dim = args.dim
+    refpdb = args.ref
+    atoms = args.atoms
+    ref = mda.Universe(refpdb)
     universes = align_traj(psfs, dcds, ref, atoms)
-    proj_all, pcs, eigvals, ref_coor, ntraj = pca_pyemma(universes, pcaatoms)
-    ref_atoms = ref.select_atoms(pcaatoms)
-    ref_atoms.positions = ref_coor
-    np.savetxt('avg_coor_pca.txt', ref_coor)
-    ref.atoms.write('avg_coor_pca.pdb')
-    
-    ntraj = np.asarray(ntraj, dtype=int)
-    cum_ntraj = np.cumsum(ntraj)[:-1]
-    
-    np.savetxt("pcs_"+outflag+'.txt', pcs)
-    np.savetxt("variance_"+outflag+'.txt', eigvals)
-    np.savetxt("projection_"+outflag+'.txt', proj_all)
+    output, eigvecs, eigvals, timescales = tica_pyemma(universes, lag=lag, dim=dim)
+    np.savetxt("tica_eigvec_"+outflag+'.txt', eigvecs)
+    np.savetxt("tica_eigval_"+outflag+'.txt', eigvals)
+    np.savetxt("tica_proj_"+outflag+'.txt', output)
+    np.savetxt("tica_timescale_"+outflag+".txt", timescales)
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+    
