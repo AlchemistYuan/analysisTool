@@ -10,8 +10,8 @@ def histogram_1d(data, nbins=50, density=True):
     x = (xedges[:-1] + xedges[1:]) / 2
     return hist.squeeze(), x.squeeze()
 
-def histogram_2d(x, y, nbins=50, density=True):
-    hist, xedges, yedges = np.histogram2d(x, y, bins=nbins, density=density)
+def histogram_2d(data_x, data_y, nbins=50, density=True):
+    hist, xedges, yedges = np.histogram2d(data_x, data_y, bins=nbins, density=density)
     x = (xedges[:-1] + xedges[1:]) / 2
     y = (yedges[:-1] + yedges[1:]) / 2
     return hist, x, y

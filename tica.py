@@ -24,12 +24,12 @@ def read_argument() -> argparse.Namespace:
     # Read the command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', dest='psf', help='The psf file', required=True)
-    parser.add_argument('-d', dest='dcd', nargs='+', help='List of dcd files', default=None)
+    parser.add_argument('-d', dest='dcd', nargs='+', help='List of dcd files to be transformed', default=None)
     parser.add_argument('-dl', dest='dcdfile', type=str, help='File containing the names of dcd files', default=None)
     parser.add_argument('-p', dest='ref', help='pdb file of ref', required=True)
     parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='name CA')
-    parser.add_argument('-l', dest='lag', type=int, help='lag time of TICA', default=10)
-    parser.add_argument('-n', dest='dim', type=int, help='dimension of the projection', default=2)
+    parser.add_argument('-l', dest='lag', type=int, help='lag time of TICA', default=100)
+    parser.add_argument('-n', dest='dim', type=int, help='dimension of the projection', default=10)
     parser.add_argument('-o', dest='outflag', help='output file flag', default='out')
     args = parser.parse_args()
     return args
@@ -40,9 +40,7 @@ def main() -> int:
     '''
     args = read_argument()
     psfs = args.psf
-    if args.dcd != None:
-        dcds = args.dcd
-    elif args.dcdfile != None:
+    if args.dcdfile != None:
         dcdfile = args.dcdfile
         dcds = []
         with open(dcdfile, 'r') as f:
@@ -59,11 +57,18 @@ def main() -> int:
     atoms = args.atoms
     ref = mda.Universe(refpdb)
     universes = align_traj(psfs, dcds, ref, atoms)
-    output, eigvecs, eigvals, timescales = tica_pyemma(universes, lag=lag, dim=dim)
+    if args.dcd:
+        psfs_transform = [psfs[0]] * len(args.dcd)
+        transform = align_traj(psfs_transform, args.dcd, ref, atoms)
+    else:
+        transform = None
+    output, transformed, eigvecs, eigvals, timescales = tica_pyemma(universes, lag=lag, dim=dim, atoms=atoms, transform=transform)
     np.savetxt("tica_eigvec_"+outflag+'.txt', eigvecs)
     np.savetxt("tica_eigval_"+outflag+'.txt', eigvals)
     np.savetxt("tica_proj_"+outflag+'.txt', output)
     np.savetxt("tica_timescale_"+outflag+".txt", timescales)
+    if type(transformed) != 'NoneType':
+        np.savetxt("tica_transformed_"+outflag+".txt", transformed)
     return 0
 
 

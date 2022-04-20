@@ -11,7 +11,7 @@ import argparse
 def read_argument() -> argparse.Namespace:
     # Read the command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', dest='psf', help='Lisf of psf files', required=True)
+    parser.add_argument('-f', dest='psf', nargs='+', help='Lisf of psf files', required=True)
     parser.add_argument('-d', dest='dcd', nargs='+', help='List of dcd files', default=None)
     parser.add_argument('-l', dest='dcdfile', help='File with the names of dcd files', default=None)
     parser.add_argument('-p', dest='refpdb', help='pdb file of ref', required=True)
@@ -26,7 +26,7 @@ def read_argument() -> argparse.Namespace:
 
 def main() -> int:
     args = read_argument()
-    psf = args.psf
+    psfs = args.psf
     dcd = args.dcd
     dcdfile = args.dcdfile
     print('Reading dcd files...')
@@ -41,7 +41,8 @@ def main() -> int:
             while line:
                 dcds.append(line.strip())
                 line = f.readline()
-    psfs = [psf] * len(dcds)
+    if len(psfs) != len(dcds):
+        psfs = [psfs[0]] * len(dcds)
 
     rpdb = args.refpdb
     outflag = args.outflag

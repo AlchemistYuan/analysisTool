@@ -2,11 +2,8 @@ import sys
 sys.path.append('/projectnb/cui-buchem/yuchen/scripts/')
 
 import MDAnalysis as mda
-from MDAnalysis.analysis import align
+from MDAnalysis.analysis.distances import self_distance_array
 import numpy as np
-from sklearn.cluster import KMeans
-from numpy.linalg import eig
-from sklearn.decomposition import PCA
 from trajanalysis import *
 import argparse
 
@@ -29,9 +26,7 @@ def read_argument() -> argparse.Namespace:
     parser.add_argument('-f', dest='psf', nargs='+', help='Lisf of psf files', required=True)
     parser.add_argument('-d', dest='dcd', nargs='+', help='List of dcd files', default=None)
     parser.add_argument('-dl', dest='dcdfile', type=str, help='File containing the names of dcd files', default=None)
-    parser.add_argument('-p', dest='refpdb', help='pdb file of ref', required=True)
-    parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='protein and backbone')
-    parser.add_argument('-pa', dest='pcaatoms', help='atoms used in PCA', default='protein and name CA')
+    parser.add_argument('-a', dest='atoms', help='atoms used in calculation', default='protein and name CA')
     parser.add_argument('-o', dest='outflag', help='output file flag', default='out')
     args = parser.parse_args()
     return args
@@ -57,26 +52,20 @@ def main() -> int:
     if len(psfs) != len(dcds):
         psfs = [psfs[0]] * len(dcds)
 
-    rpdb = args.refpdb
     atoms = args.atoms
-    pcaatoms = args.pcaatoms
     outflag = args.outflag
-    ref = mda.Universe(rpdb)
-    universes = align_traj(psfs, dcds, ref, atoms)
-    proj_all, pcs, eigvals, ref_coor, ntraj = pca_scikit(universes, pcaatoms)
-    ref_atoms = ref.select_atoms(pcaatoms)
-    ref_atoms.positions = ref_coor
-    np.savetxt('avg_coor_pca_'+outflag+'.txt', ref_coor)
-    ref.atoms.write('avg_coor_pca_'+outflag+'.pdb')
     
-    ntraj = np.asarray(ntraj, dtype=int)
-    cum_ntraj = np.cumsum(ntraj)[:-1]
-    
-    np.savetxt("pcs_"+outflag+'.txt', pcs)
-    np.savetxt("variance_"+outflag+'.txt', eigvals)
-    np.savetxt("projection_"+outflag+'.txt', proj_all)
+    prota_selection = 'segid PROA and ' + atoms
+    protb_selection = 'segid PROB and ' + atoms
+
+    u = mda.Universe(psf, dcds)
+    distances_a = calc_pair_wise_distance(u, atoms=prota_selection)
+    distances_b = calc_pair_wise_distance(u, atoms=protb_selection)
+    distances = np.concatenate((distances_a, distances_b), axis=1)
+    np.savetxt('pair_wise_distances_{0:s}.txt'.format(outflag), distances)
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

@@ -4,7 +4,7 @@ import pyemma
 import numpy as np
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
-def kmeans_scikit(data: np.array, k: int=250):
+def kmeans_scikit(data: np.array, k: int=250, batch_size: int=0) -> Tuple[np.ndarray, np.ndarray]:
     '''
     This function performs kmeans clustering using sci-kit learn. 
 
@@ -14,22 +14,31 @@ def kmeans_scikit(data: np.array, k: int=250):
         The array of input features of shape (nframe, nfeatures)
     k : int
         The number of the clusters
-    
+    batch_size : int
+        Batch size for MiniBatchKmeans. Default is 0, which means not to use MiniBatchKMeans.
     Returns
     -------
     centers : ndarray of shape (n_clusters, n_features)
         Coordinates of cluster centers
     labels : ndarray of shape (n_samples,)
         The assignment of the each frame to each cluster.
+    cluster_center_indices : ndarray of shape (n_clusters,)
+        The frame indices cloesest to each cluster
     '''
-    kmeans = MiniBatchKMeans(init="k-means++", n_clusters=k, batch_size=4096)
-    kmeans.fit(data)
+    if batch_size > 0:
+        kmeans = MiniBatchKMeans(init="k-means++", n_clusters=k, batch_size=batch_size)
+    else:
+        kmeans = KMeans(init="k-means++", n_clusters=k)
+    distances = kmeans.fit_transform(data)
     centers = kmeans.cluster_centers_
     labels = kmeans.labels_
-    return (centers, labels)
+    labels = np.asarray(labels, dtype=int)
+    cluster_center_indices = np.argmin(distances, axis=0)
+    cluster_center_indices = np.asarray(cluster_center_indices, dtype=int)
+    return (centers, labels, cluster_center_indices)
 
 
-def tica_pyemma(universes: list, lag: int=2, dim: int=1, atoms: str='name CA') -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def tica_pyemma(universes: list, lag: int=2, dim: int=1, atoms: str='name CA', transform: Union[None, list]=None) -> Tuple[np.ndarray, Union[np.ndarray,None], np.ndarray, np.ndarray]:
     '''
     This function performs time-lagged independent component analysis (TICA).
 
@@ -45,15 +54,21 @@ def tica_pyemma(universes: list, lag: int=2, dim: int=1, atoms: str='name CA') -
         default value is 1.
     atoms : str
         The atoms used in TICA.
+    transform : list or None
+        The list of dcd files to be transformed. The default is None.
 
     Returns
     -------
     output : np.ndarray
         The projection of the trajectories onto the tica components
+    transformed : np.ndarray or None
+        The projection of other trajectories onto the already-computed tica components
     eigenvectors : np.ndarray
         The eigenvectors of TICA
     eigenvalues : np.ndarray
         The eigenvalues of TICA
+    timescales : np.ndarray
+        The timescales of TICA
     '''
     print('starting TICA...')
     ntraj = []
@@ -81,9 +96,17 @@ def tica_pyemma(universes: list, lag: int=2, dim: int=1, atoms: str='name CA') -
     eigvecs = runner.eigenvectors
     eigvals = runner.eigenvalues
     timescales = runner.timescales
-    return (output, eigvecs, eigvals, timescales)
-
-
-#def msm_pyemma(dtrajs: Union[list, np.ndarray], lags: list, nits: int, errors: str='bayes'):
-#    its = pyemma.msm.its(dtrajs, lags=lags, nits=nits, errors=errors)
-    
+    if type(transform) != 'NoneType':
+        coors_transform = []
+        for i, u in enumerate(transform):
+            coors = u.trajectory.timeseries(u.select_atoms(atoms), order='fac')
+            if i in [0, 2]:
+                coors = coors[::24,:,:]
+            coors_transform.append(coors)
+        coors_transform = np.concatenate(coors_transform)
+        x = coors_transform.ravel().reshape(coors_transform.shape[0],3*coors_transform.shape[1])
+        x = x.astype('float32')
+        transformed = runner.transform(x)
+    else:
+        transformed = None
+    return (output, transformed, eigvecs, eigvals, timescales)

@@ -4,9 +4,6 @@ sys.path.append('/projectnb/cui-buchem/yuchen/scripts/')
 import MDAnalysis as mda
 from MDAnalysis.analysis import align
 import numpy as np
-from sklearn.cluster import KMeans
-from numpy.linalg import eig
-from sklearn.decomposition import PCA
 from trajanalysis import *
 import argparse
 
@@ -30,8 +27,7 @@ def read_argument() -> argparse.Namespace:
     parser.add_argument('-d', dest='dcd', nargs='+', help='List of dcd files', default=None)
     parser.add_argument('-dl', dest='dcdfile', type=str, help='File containing the names of dcd files', default=None)
     parser.add_argument('-p', dest='refpdb', help='pdb file of ref', required=True)
-    parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='protein and backbone')
-    parser.add_argument('-pa', dest='pcaatoms', help='atoms used in PCA', default='protein and name CA')
+    parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='protein and backbone and resid 48:63')
     parser.add_argument('-o', dest='outflag', help='output file flag', default='out')
     args = parser.parse_args()
     return args
@@ -59,22 +55,22 @@ def main() -> int:
 
     rpdb = args.refpdb
     atoms = args.atoms
-    pcaatoms = args.pcaatoms
     outflag = args.outflag
     ref = mda.Universe(rpdb)
     universes = align_traj(psfs, dcds, ref, atoms)
-    proj_all, pcs, eigvals, ref_coor, ntraj = pca_scikit(universes, pcaatoms)
-    ref_atoms = ref.select_atoms(pcaatoms)
-    ref_atoms.positions = ref_coor
-    np.savetxt('avg_coor_pca_'+outflag+'.txt', ref_coor)
-    ref.atoms.write('avg_coor_pca_'+outflag+'.pdb')
+   
+    # Find the a4 helix vector for the DNA-bound crystal
+    res48a = ref.select_atoms('backbone and segid PROA and resid 48').positions
+    res48b = ref.select_atoms('backbone and segid PROB and resid 48').positions
+    res63a = ref.select_atoms('backbone and segid PROA and resid 63').positions
+    res63b = ref.select_atoms('backbone and segid PROB and resid 63').positions
+    a4a_vec = np.mean(res48a, axis=0) - np.mean(res63a, axis=0)
+    a4b_vec = np.mean(res48b, axis=0) - np.mean(res63b, axis=0)
+    dna_a4 = np.concatenate((a4a_vec.reshape(1,-1), a4b_vec.reshape(1,-1)), axis=0)
+ 
+    angles, ntraj = angle_a4(universes, dna_a4) 
     
-    ntraj = np.asarray(ntraj, dtype=int)
-    cum_ntraj = np.cumsum(ntraj)[:-1]
-    
-    np.savetxt("pcs_"+outflag+'.txt', pcs)
-    np.savetxt("variance_"+outflag+'.txt', eigvals)
-    np.savetxt("projection_"+outflag+'.txt', proj_all)
+    np.savetxt("angle_a4_"+outflag+'.txt', angles)
     return 0
 
 

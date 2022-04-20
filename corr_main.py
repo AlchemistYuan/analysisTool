@@ -4,11 +4,11 @@ sys.path.append('/projectnb/cui-buchem/yuchen/scripts/')
 import MDAnalysis as mda
 from MDAnalysis.analysis import align
 import numpy as np
-from sklearn.cluster import KMeans
-from numpy.linalg import eig
-from sklearn.decomposition import PCA
 from trajanalysis import *
 import argparse
+
+from correlations import *
+from utils import *
 
 
 def read_argument() -> argparse.Namespace:
@@ -30,8 +30,11 @@ def read_argument() -> argparse.Namespace:
     parser.add_argument('-d', dest='dcd', nargs='+', help='List of dcd files', default=None)
     parser.add_argument('-dl', dest='dcdfile', type=str, help='File containing the names of dcd files', default=None)
     parser.add_argument('-p', dest='refpdb', help='pdb file of ref', required=True)
-    parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='protein and backbone')
-    parser.add_argument('-pa', dest='pcaatoms', help='atoms used in PCA', default='protein and name CA')
+    parser.add_argument('-a', dest='atoms', help='atoms used in alignment', default='protein and name CA')
+    parser.add_argument('-b', dest='begin', type=int, help='first frame', default=0)
+    parser.add_argument('-e', dest='end', type=int, help='last frame', default=-1)
+    parser.add_argument('-s', dest='stride', type=int, help='stride to read frames', default=1)
+    parser.add_argument('-m', dest='method', help='type of correlation', default='pearson')
     parser.add_argument('-o', dest='outflag', help='output file flag', default='out')
     args = parser.parse_args()
     return args
@@ -59,22 +62,21 @@ def main() -> int:
 
     rpdb = args.refpdb
     atoms = args.atoms
-    pcaatoms = args.pcaatoms
+    begin = args.begin
+    stop = args.end
+    stride = args.stride
     outflag = args.outflag
+    method = args.method
     ref = mda.Universe(rpdb)
     universes = align_traj(psfs, dcds, ref, atoms)
-    proj_all, pcs, eigvals, ref_coor, ntraj = pca_scikit(universes, pcaatoms)
-    ref_atoms = ref.select_atoms(pcaatoms)
-    ref_atoms.positions = ref_coor
-    np.savetxt('avg_coor_pca_'+outflag+'.txt', ref_coor)
-    ref.atoms.write('avg_coor_pca_'+outflag+'.pdb')
+    corr_mat = calc_correlation(universes, atoms, begin, stop, stride, method)
     
-    ntraj = np.asarray(ntraj, dtype=int)
-    cum_ntraj = np.cumsum(ntraj)[:-1]
-    
-    np.savetxt("pcs_"+outflag+'.txt', pcs)
-    np.savetxt("variance_"+outflag+'.txt', eigvals)
-    np.savetxt("projection_"+outflag+'.txt', proj_all)
+    if method == 'pearson':
+        np.savetxt("corr_"+outflag+'.txt', corr_mat)
+    elif method == 'spearson':
+        np.savetxt("spearmancorr_"+outflag+'.txt', corr_mat)
+    elif method == 'mutual':
+        np.savetxt("mutualinfo_"+outflag+'.txt', corr_mat)
     return 0
 
 
