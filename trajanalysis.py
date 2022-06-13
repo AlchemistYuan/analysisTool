@@ -3,15 +3,11 @@ sys.path.append('/projectnb/cui-buchem/yuchen/scripts')
 from typing import Tuple, Union
 
 import MDAnalysis as mda
-from MDAnalysis.analysis import align, rms
-from MDAnalysis.analysis.distances import self_distance_array
 import mdtraj as md
 import numpy as np
 import pyemma
-from sklearn.cluster import KMeans
-from numpy.linalg import eig
+from MDAnalysis.analysis import align, rms
 from sklearn.decomposition import PCA
-from scipy.stats import spearmanr
 
 from utils import *
 
@@ -32,7 +28,7 @@ def align_traj(psfs: list, dcds: list, ref: mda.Universe, atoms: str) -> list:
         A list of the dcd files
     ref : MDAnalysis.Universe
         An MDAnalysis.Universe object for the reference structure
-    atoms : string
+    atoms : str
         The atom selection string.
 
     Returns
@@ -45,7 +41,7 @@ def align_traj(psfs: list, dcds: list, ref: mda.Universe, atoms: str) -> list:
     for i, psf in enumerate(psfs):
         dcd = dcds[i]
         u = mda.Universe(psf, dcd)
-        alignment = align.AlignTraj(u, ref, select=atoms, in_memory=True).run()
+        align.AlignTraj(u, ref, select=atoms, in_memory=True).run()
         universes.append(u)
         print('one trajectory completed...')
     return universes
@@ -102,7 +98,7 @@ def pca_pyemma(universes: list, atoms: str, dim: int=10) -> Tuple[np.ndarray, np
     eigvals = runner.eigenvalues
     mean_coor = runner.mean
     mean_coor = np.reshape(mean_coor, (-1,3))
-    return (output, eigvecs.T, eigvals, mean_coor, ntraj)
+    return output, eigvecs.T, eigvals, mean_coor, ntraj
 
 def pca_scikit(universes: list, atoms: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.array]:
     '''
@@ -155,7 +151,7 @@ def pca_scikit(universes: list, atoms: str) -> Tuple[np.ndarray, np.ndarray, np.
     components = pca.components_
     variance = pca.explained_variance_
     mean_coor = np.mean(coor, axis=0)
-    return (proj, components, variance, mean_coor, ntraj)
+    return proj, components, variance, mean_coor, ntraj
 
 def projection(pcs: np.ndarray, ref_coor: np.ndarray, universe: mda.Universe, atoms: str) -> np.ndarray:
     '''
@@ -190,9 +186,26 @@ def projection(pcs: np.ndarray, ref_coor: np.ndarray, universe: mda.Universe, at
         proj = proj[:,:10]
     return proj
 
-def rmsd(universes, ref, refatoms):
+def rmsd(universes: list, ref: mda.Universe, refatoms: str) -> np.ndarray:
+    """
+    Compute the root mean square deviation for all trajectories
+
+    Parameters
+    ----------
+    universes : list
+        The list of mda Universes
+    ref : mda.Universe
+        The reference structure
+    refatoms : str
+        The atoms to be aligned against
+
+    Returns
+    -------
+    rmsd_all : np.ndarray
+        The computed rmsd values
+    """
     ntraj = count_frame(universes)
-    rmsd_all = np.zeros((np.sum(ntraj),2))
+    rmsd_all = np.zeros((np.sum(ntraj), 2))
     start = 0
     end = 0
     print('Starting RMSD calculations...')
@@ -200,30 +213,57 @@ def rmsd(universes, ref, refatoms):
         rmsder = rms.RMSD(u, ref, select=refatoms)
         rmsder.run()
         end += ntraj[i]
-        rmsd_all[start:end,0] = rmsder.rmsd[:,2]
-        rmsd_all[start:end,1] = int(i)
+        rmsd_all[start:end, 0] = rmsder.rmsd[:, 2]
+        rmsd_all[start:end, 1] = int(i)
         start += ntraj[i]
     return rmsd_all
 
-def rmsf(universes, refatoms):
-    ntraj = count_frame(universes)
-    natoms = len(universes[0].select_atoms(refatoms))
-    coors_all = [] 
+ef rmsf(universes: list, refatoms: str) -> np.ndarray:
+    """
+    Compute the root mean square fluctuation of each protein residue.
+
+    Parameters
+    ----------
+    universes : list
+        The list of mda Universes
+    refatoms : str
+        The atoms to be aligned against
+
+    Returns
+    -------
+    rmsf_all : np.ndarray
+        The computed rmsf values
+    """
+    coors_all = []
     for i, u in enumerate(universes):
         protein = u.select_atoms('protein')
         atoms = u.select_atoms(refatoms)
         coor = u.trajectory.timeseries(protein, order='fac')
         coors_all.append(coor)
     coors_all = np.concatenate(coors_all)
+    protein = universes[0].select_atoms('protein')
     u_new = mda.Merge(protein).load_new(coors_all, order="fac")
-    ref_avg = mda.Merge(protein).load_new(coors_all.mean(axis=0)[None,:,:], order="fac")
-    aligner = align.AlignTraj(u_new, ref_avg, select=refatoms, in_memory=True).run()
-    rmsfer = rms.RMSF(atoms, verbose=True)
+    ref_avg = mda.Merge(protein).load_new(coors_all.mean(axis=0)[None, :, :], order="fac")
+    align.AlignTraj(u_new, ref_avg, select=refatoms, in_memory=True).run()
+    rmsfer = rms.RMSF(refatoms, verbose=True)
     rmsfer.run()
     rmsf_all = rmsfer.rmsf
     return rmsf_all
 
 def count_frame(universes: list) -> list:
+    """
+    Count the number of frames for each trajectory
+
+    Parameters
+    ----------
+    universes : list
+        The list of mda Universes
+
+    Returns
+    -------
+    ntraj : np.ndarray
+        The array to store the number of frames
+    """
     print('Counting number of frame...')
     ntraj = []
     for u in universes:
@@ -231,12 +271,31 @@ def count_frame(universes: list) -> list:
     ntraj = np.asarray(ntraj, dtype=int)
     return ntraj
 
-def distanceDBD(psfs, dcds, stride=1):
+def distanceDBD(psfs: list, dcds: list, stride: int=1) -> tuple[np.ndarray, list[int]]:
+    """
+    Compute the DNA-binding domain distance.
+    This is specific for the TetR(B) so the atom selection is hard-coded.
+
+    Parameters
+    ----------
+    psfs : list
+        The list of the psf files
+    dcds : list
+        The list of the dcd files
+    stride : int
+        The step interval to read frames
+
+    Returns
+    -------
+    distances : np.ndarray
+        The DNA-binding domain distances
+    ntraj : list
+        The number of frames for each trajectory
+    """
     universes = []
     ntraj = []
     for i in range(len(psfs)):
         u = mda.Universe(psfs[i], dcds[i])
-        #alignment = align.AlignTraj(u, u, select='name CA and resid 37:44', in_memory=True).run()
         universes.append(u)
         ntraj.append(len(u.trajectory[::stride]))
     distances = np.zeros(np.sum(ntraj))
@@ -244,8 +303,8 @@ def distanceDBD(psfs, dcds, stride=1):
     for j, u in enumerate(universes):
         dbda = u.select_atoms('name CA and segid PROA and resid 37:44')
         dbdb = u.select_atoms('name CA and segid PROB and resid 37:44')
-        dbda_position = u.trajectory.timeseries(dbda, order='fca')[::stride,:,:]
-        dbdb_position = u.trajectory.timeseries(dbdb, order='fca')[::stride,:,:]
+        dbda_position = u.trajectory.timeseries(dbda, order='fca')[::stride, :, :]
+        dbdb_position = u.trajectory.timeseries(dbdb, order='fca')[::stride, :, :]
         dbda_com = np.mean(dbda_position, axis=2)
         dbdb_com = np.mean(dbdb_position, axis=2)
         diff = dbda_com - dbdb_com
@@ -255,7 +314,23 @@ def distanceDBD(psfs, dcds, stride=1):
         start += ntraj[j]
     return distances, ntraj
 
-def angle_a4(universes, dna_a4):
+def angle_a4(universes: list, dna_a4: np.ndarray) -> tuple[np.ndarray, list[int]]:
+    """
+    Compute the angle of the alpha helix 4 relative to the
+    Parameters
+    ----------
+    universes : list
+        The list of mda Universes
+    dna_a4 : np.ndarray
+        The reference position of the alpha helix 4 in the DNA-bound state reference structure
+
+    Returns
+    -------
+    angles : np.ndarray
+        The alpha helix 4 angles
+    ntraj : list
+        The number of frames for each trajectory
+    """
     ntraj = []
     for u in universes:
         ntraj.append(len(u.trajectory))
@@ -274,52 +349,55 @@ def angle_a4(universes, dna_a4):
         res63b_position = np.mean(u.trajectory.timeseries(res63b, order='fac'), axis=1)
         a4a_vec = res48a_position - res63a_position
         a4b_vec = res48b_position - res63b_position
-        a4a_dot = np.dot(a4a_vec, dna_a4[0,:])
-        a4b_dot = np.dot(a4b_vec, dna_a4[1,:])
+        a4a_dot = np.dot(a4a_vec, dna_a4[0, :])
+        a4b_dot = np.dot(a4b_vec, dna_a4[1, :])
         a4a_norm = np.linalg.norm(a4a_vec, axis=1)
         a4b_norm = np.linalg.norm(a4b_vec, axis=1)
         a4a_cos = a4a_dot / (np.linalg.norm(dna_a4, axis=1)[0] * a4a_norm)
         a4b_cos = a4b_dot / (np.linalg.norm(dna_a4, axis=1)[1] * a4b_norm)
-        cos = np.concatenate((a4a_cos.reshape(-1,1), a4b_cos.reshape(-1,1)), axis=1)
+        cos = np.concatenate((a4a_cos.reshape(-1, 1), a4b_cos.reshape(-1, 1)), axis=1)
         angle = 180 * np.arccos(cos) / np.pi
         end += ntraj[i]
-        angles[start:end,:] = angle
+        angles[start:end, :] = angle
         start += ntraj[i]
     return angles, ntraj
 
-
-def calc_contact_map(psf: str, dcd: list, pairs: list, chunksize: int=100, stride: int=1, cutoff: float=0.5, convert: Union[str, list]='square') -> Tuple[np.ndarray, np.ndarray]:
-    '''
+def calc_contact_map(psf: str, dcd: list, pairs: list, chunksize: int = 100, stride: int = 1, cutoff: float=0.5,
+                     convert: Union[str, list] = 'square') -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
     This function takes in a psf and dcd file and then creates a mdtraj trajectory.
     The trajectory is loaded into an iterator.
-    For each chunk, the pair-wise residue distances are calculated 
+    For each chunk, the pair-wise residue distances are calculated
     as specified in the pairs variable.
     The distances are reshaped to a square form for visualization purpose.
     The distances in each frame which are within a cutoff distance are recognized as a contact and denoted as 1.
-    Finally, the diagonal and first and second off-diagonal elements are set to zero and the contact probability is calculated as the sum of ones divided by the number of frames. 
+    Finally, the diagonal and first and second off-diagonal elements are set to zero and the contact probability is calculated as the sum of ones divided by the number of frames.
     Equivalently, the distances with self and i+1, i+2 residues are excluded.
-    '''
-    distances = []
-    contact_maps = []
+    """
     trajs = []
     for d in dcd:
         u = md.iterload(d, top=psf, chunk=chunksize, stride=stride)
         trajs.append(u)
+    distances = np.empty((0, len(pairs)), dtype=np.float32)
     print('Iterating trajectory...')
     for u in trajs:
         for chunk in u:
             distance, residue_pairs = md.compute_contacts(chunk, contacts=pairs)
-            distances.append(distance)
-
+            distances = np.append(distances, distance, axis=0)
+    del trajs
+    #u = mda.Universe(psf, dcd)
+    #prot = u.select_atoms('protein and not hydrogen')
+    #distances = np.zeros((len(u.trajectory[::stride]), len(pairs)), dtype=np.float32)
+    #for i, ts in enumerate(u.trajectory[::stride]):
+    #    distances[i,:] = self_distance_array(prot.positions)
     print('Iteration done')
-    distances = np.concatenate(distances)
-    if isinstance(convert, str) and convert=='square':
+    #distances = np.concatenate(distances)
+    #residue_pairs = pairs
+    if isinstance(convert, str) and convert == 'square':
         contact_probability, contact_maps_avg = convert_to_square_form(distances, residue_pairs, cutoff=cutoff)
-        return (contact_probability, contact_maps_avg)
-    elif isinstance(convert, list) and len(convert)==2:
+        return contact_probability, contact_maps_avg, distances
+    elif isinstance(convert, list) and len(convert) == 2:
         contact_probability, contact_maps_avg = convert_to_nonsquare_form(distances, convert, cutoff=cutoff)
-        return (contact_probability, contact_maps_avg) 
+        return contact_probability, contact_maps_avg, distances
     else:
-        print(type(convert))
-        print('something is wrong')
-
+        raise ValueError(f'{convert} is not supported')

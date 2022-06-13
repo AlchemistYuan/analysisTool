@@ -45,29 +45,31 @@ def main() -> int:
     # The residue pairs between which the distances to be calculated are hard-coded here. 
     pairs = []
     if args.pair == None:
-        pair_a = list(range(404))
-        pair_b = list(range(404))
+        for i in range(404):
+            for j in range(404):
+                pair = [i,j]
+                pairs.append(pair)
     else:
         with open(args.pair, 'r') as f:
             pair_a = f.readline().split()
             pair_b = f.readline().split()
-            pair_a = np.asarray(pair_a, dtype=int)
-            pair_b = np.asarray(pair_b, dtype=int)
-
-    for i in pair_a:
-        for j in pair_b:
-            pair = [i,j]
-            pairs.append(pair)
-
+        pair_a = np.asarray(pair_a, dtype=int)
+        pair_b = np.asarray(pair_b, dtype=int)
+        for i in pair_a:
+            for j in pair_b:
+                pair = [i,j]
+                pairs.append(pair)
+    pairs = np.asarray(pairs, dtype=int)
     if isinstance(args.convert, type(None)):
         convert = 'square'
     elif isinstance(args.convert, str):
         convert = args.convert.split(' ')
         convert = np.asarray(convert, dtype=int).tolist()
 
-    contact_probability, contact_maps_avg = calc_contact_map(psf, dcd, pairs, chunksize=args.chunk, convert=convert, stride=args.stride, cutoff=args.cut)
-    np.savetxt('contact_probability_{0:s}.txt'.format(args.outflag), contact_probability)
-    np.savetxt('contact_distance_avg_{0:s}.txt'.format(args.outflag), contact_maps_avg)
+    contact_probability, contact_maps_avg, distances = calc_contact_map(psf, dcd, pairs, chunksize=args.chunk, convert=convert, stride=args.stride, cutoff=args.cut)
+    np.savetxt(f'contact_probability_{args.outflag}.txt', contact_probability, fmt='%1.3f')
+    np.savetxt(f'contact_distance_avg_{args.outflag}.txt', contact_maps_avg)
+    np.save(f'contact_distance_all_{args.outflag}.npy', distances)
     return 0
 
 
