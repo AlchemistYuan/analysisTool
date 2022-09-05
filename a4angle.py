@@ -39,9 +39,9 @@ def main() -> int:
     '''
     args = read_argument()
     psfs = args.psf
-    if args.dcd != None:
+    if args.dcd is not None:
         dcds = args.dcd
-    elif args.dcdfile != None:
+    elif args.dcdfile is not None:
         dcdfile = args.dcdfile
         dcds = []
         with open(dcdfile, 'r') as f:

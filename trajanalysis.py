@@ -218,7 +218,7 @@ def rmsd(universes: list, ref: mda.Universe, refatoms: str) -> np.ndarray:
         start += ntraj[i]
     return rmsd_all
 
-ef rmsf(universes: list, refatoms: str) -> np.ndarray:
+def rmsf(universes: list, refatoms: str) -> np.ndarray:
     """
     Compute the root mean square fluctuation of each protein residue.
 
